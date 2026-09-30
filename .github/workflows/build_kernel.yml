@@ -18,7 +18,10 @@ jobs:
 
       - name: Download AOSP Clang
         run: |
-          git clone --depth=1 https://gitlab.com/ElectroPerf/prebuilts_clang_host_linux-x86_clang-r487747c.git clang
+          mkdir -p clang
+          curl -LO "https://github.com/crdroid-packages/android_prebuilts_clang_host_linux-x86_clang-r487747c/archive/refs/heads/14.0.tar.gz"
+          tar -xf 14.0.tar.gz -C clang --strip-components=1
+          rm -f 14.0.tar.gz
 
       - name: Clone AnyKernel3
         run: |
