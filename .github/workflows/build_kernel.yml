@@ -14,7 +14,7 @@ jobs:
       - name: Setup Build Dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential bc bison flex libssl-dev libelf-dev libncurses5-dev git zip curl wget
+          sudo apt-get install -y build-essential bc bison flex libssl-dev libelf-dev libncurses5-dev git zip curl wget gcc-aarch64-linux-gnu gcc-arm-linux-gnueabi
 
       - name: Download Official AOSP Clang
         run: |
@@ -32,11 +32,13 @@ jobs:
           export PATH="$(pwd)/clang/bin:$PATH"
           export ARCH=arm64
           export SUBARCH=arm64
+          export CC=clang
           export CLANG_TRIPLE=aarch64-linux-gnu-
           export CROSS_COMPILE=aarch64-linux-gnu-
           export CROSS_COMPILE_COMPAT=arm-linux-gnueabi-
 
-          make O=out ARCH=arm64 vili_user_defconfig
+          # Defconfig-ൽ CC=clang കൃത്യമായി നൽകുന്നു
+          make O=out ARCH=arm64 CC=clang vili_user_defconfig
 
           # Configure Flags for HyperOS & New Android Ports
           scripts/config --file out/.config \
@@ -48,10 +50,10 @@ jobs:
             -e CONFIG_TOUCHSCREEN_XIAOMI_TOUCHFEATURE
 
           # Build raw Image, DTBs, DTBO, and Modules
-          make -j$(nproc --all) O=out CC=clang Image dtbs dtbo.img modules
+          make -j$(nproc --all) O=out ARCH=arm64 CC=clang Image dtbs dtbo.img modules
 
           # Install kernel modules
-          make O=out CC=clang INSTALL_MOD_PATH=../modules_out modules_install
+          make O=out ARCH=arm64 CC=clang INSTALL_MOD_PATH=../modules_out modules_install
 
       - name: Prepare AnyKernel3 Package
         run: |
