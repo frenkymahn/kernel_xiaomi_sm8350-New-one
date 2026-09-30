@@ -16,12 +16,12 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y build-essential bc bison flex libssl-dev libelf-dev libncurses5-dev git zip curl wget
 
-      - name: Download AOSP Clang
+      - name: Download Official AOSP Clang
         run: |
-          mkdir -p clang
-          curl -LO "https://github.com/crdroid-packages/android_prebuilts_clang_host_linux-x86_clang-r487747c/archive/refs/heads/14.0.tar.gz"
-          tar -xf 14.0.tar.gz -C clang --strip-components=1
-          rm -f 14.0.tar.gz
+          git clone --depth=1 https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86 -b android14-release clang_host
+          CLANG_DIR=$(ls -d clang_host/clang-r* | head -n 1)
+          mv "$CLANG_DIR" clang
+          rm -rf clang_host
 
       - name: Clone AnyKernel3
         run: |
@@ -38,7 +38,7 @@ jobs:
 
           make O=out ARCH=arm64 vili_user_defconfig
 
-          # Configure Flags
+          # Configure Flags for HyperOS & New Android Ports
           scripts/config --file out/.config \
             --set-str CONFIG_LOCALVERSION "-Next-Gen" \
             -e CONFIG_OVERLAY_FS \
@@ -55,24 +55,30 @@ jobs:
 
       - name: Prepare AnyKernel3 Package
         run: |
+          # 1. Copy Kernel Image
           cp out/arch/arm64/boot/Image AnyKernel3/Image
 
+          # 2. Concatenate and Copy DTB
           if [ -d out/arch/arm64/boot/dts/vendor/qcom ]; then
             cat out/arch/arm64/boot/dts/vendor/qcom/*.dtb > AnyKernel3/dtb 2>/dev/null || true
           elif [ -f out/arch/arm64/boot/dtb ]; then
             cp out/arch/arm64/boot/dtb AnyKernel3/dtb
           fi
 
+          # 3. Copy DTBO Image
           find out/arch/arm64/boot/ -name "dtbo.img" -exec cp {} AnyKernel3/dtbo.img \;
 
+          # 4. Prepare Modules Directory
           mkdir -p AnyKernel3/modules/vendor/lib/modules
           find ../modules_out/ -name "*.ko" -exec cp {} AnyKernel3/modules/vendor/lib/modules/ \; 2>/dev/null || true
           touch AnyKernel3/modules/placeholder
 
+          # 5. Setup AnyKernel3 Configuration
           sed -i 's/device.name1=.*/device.name1=vili/g' AnyKernel3/anykernel.sh
           sed -i 's/block=.*/block=\/dev\/block\/bootdevice\/by-name\/boot/g' AnyKernel3/anykernel.sh
           sed -i 's/is_slot_device=0/is_slot_device=auto/g' AnyKernel3/anykernel.sh
 
+          # 6. Create Flashable Zip
           cd AnyKernel3
           zip -r9 ../Next-Gen-HyperOS-Vili-Kernel.zip META-INF modules tools anykernel.sh dtb dtbo.img Image LICENSE -x .git README.md
 
