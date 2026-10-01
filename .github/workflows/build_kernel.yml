@@ -65,16 +65,24 @@ jobs:
           # 1. Clone AnyKernel3
           git clone --depth=1 https://github.com/osm0sis/AnyKernel3.git AnyKernel3
 
-          # 2. Copy artifacts to AnyKernel3 root
+          # 2. Copy compiled Image and DTBO
           cp out/arch/arm64/boot/Image AnyKernel3/Image
           cp out/arch/arm64/boot/dtbo.img AnyKernel3/dtbo.img
-          find out/arch/arm64/boot/dts/ -name "*.dtb" -exec cat {} + > AnyKernel3/dtb
 
-          # 3. Generate fully tuned anykernel.sh for HyperOS 3.0/4.0
+          # 3. Extract ONLY the exact vili DTB (No cat mess)
+          VILI_DTB=$(find out/arch/arm64/boot/dts/ -name "*vili*.dtb" | head -n 1)
+          if [ -n "$VILI_DTB" ]; then
+            echo "Found vili DTB: $VILI_DTB"
+            cp "$VILI_DTB" AnyKernel3/dtb
+          else
+            find out/arch/arm64/boot/dts/vendor/qcom/ -name "lahaina*.dtb" | head -n 1 | xargs -I {} cp {} AnyKernel3/dtb
+          fi
+
+          # 4. Generate Safe anykernel.sh (Preserves TWRP Ramdisk)
           cat << 'EOF' > AnyKernel3/anykernel.sh
           ### AnyKernel3 Ramdisk Mod Script
           ## osm0sis @ xda-developers
-          ## Tuned for Xiaomi 11T Pro (vili) - HyperOS 3.0/4.0 (A16-A17)
+          ## Safe Flasher for Xiaomi 11T Pro (vili)
 
           properties() { '
           kernel.string=NextGen Kernel for Xiaomi 11T Pro (vili)
@@ -88,11 +96,9 @@ jobs:
           device.name3=vili
           device.name4=vili_in
           supported.versions=11.0-17.0
-          supported.patchlevels=
-          supported.vendorpatchlevels=
           '; }
 
-          # 1. Boot Partition Setup
+          # Boot partition setup (Preserves TWRP in ramdisk)
           BLOCK=boot;
           IS_SLOT_DEVICE=1;
           RAMDISK_COMPRESSION=auto;
@@ -102,29 +108,19 @@ jobs:
 
           dump_boot;
 
-          # Avoid bootloop on Android 16/17 port ROMs by enforcing permissive cmdline
+          # Fix SELinux crash on Android 16/17 port ROMs
           patch_cmdline "androidboot.selinux" "androidboot.selinux=permissive";
 
           write_boot;
 
-          # 2. Flash DTBO Partition (Display & Touch Panel sync)
+          # Flash DTBO Partition safely
           flash_dtbo;
 
-          # 3. Flash DTB to Vendor Boot Partition
-          BLOCK=vendor_boot;
-          IS_SLOT_DEVICE=1;
-          RAMDISK_COMPRESSION=auto;
-          PATCH_VBMETA_FLAG=auto;
-
-          reset_ak;
-
-          split_boot;
-          unpack_ramdisk;
-          repack_ramdisk;
-          flash_boot;
+          # Flash DTB to dtb/vendor_boot partition natively without breaking ramdisk
+          flash_dtb;
           EOF
 
-          # 4. Create flashable zip package
+          # 5. Create flashable zip package
           cd AnyKernel3
           zip -r9 ../Xiaomi-11T-Pro-NextGen-Kernel.zip * -x .git README.md
 
