@@ -69,20 +69,15 @@ jobs:
           cp out/arch/arm64/boot/Image AnyKernel3/Image
           cp out/arch/arm64/boot/dtbo.img AnyKernel3/dtbo.img
 
-          # 3. Extract ONLY the exact vili DTB (No cat mess)
-          VILI_DTB=$(find out/arch/arm64/boot/dts/ -name "*vili*.dtb" | head -n 1)
-          if [ -n "$VILI_DTB" ]; then
-            echo "Found vili DTB: $VILI_DTB"
-            cp "$VILI_DTB" AnyKernel3/dtb
-          else
-            find out/arch/arm64/boot/dts/vendor/qcom/ -name "lahaina*.dtb" | head -n 1 | xargs -I {} cp {} AnyKernel3/dtb
-          fi
+          # 3. Build Full Official 4.8MB DTB from compiled lahaina bases
+          cat out/arch/arm64/boot/dts/vendor/qcom/lahaina*.dtb > AnyKernel3/dtb
+          ls -lh AnyKernel3/dtb
 
-          # 4. Generate Safe anykernel.sh (Preserves TWRP Ramdisk)
+          # 4. Generate Safe AnyKernel Script (No ERROR 1, Preserves Recovery Ramdisk)
           cat << 'EOF' > AnyKernel3/anykernel.sh
           ### AnyKernel3 Ramdisk Mod Script
           ## osm0sis @ xda-developers
-          ## Safe Flasher for Xiaomi 11T Pro (vili)
+          ## Tested for Xiaomi 11T Pro (vili)
 
           properties() { '
           kernel.string=NextGen Kernel for Xiaomi 11T Pro (vili)
@@ -98,7 +93,7 @@ jobs:
           supported.versions=11.0-17.0
           '; }
 
-          # Boot partition setup (Preserves TWRP in ramdisk)
+          # --- 1. Flash Kernel Image to boot partition ---
           BLOCK=boot;
           IS_SLOT_DEVICE=1;
           RAMDISK_COMPRESSION=auto;
@@ -107,17 +102,22 @@ jobs:
           . tools/ak3-core.sh && passthrough;
 
           dump_boot;
-
-          # Fix SELinux crash on Android 16/17 port ROMs
+          # Port ROM crash fix
           patch_cmdline "androidboot.selinux" "androidboot.selinux=permissive";
-
           write_boot;
 
-          # Flash DTBO Partition safely
+          # --- 2. Flash DTBO Partition safely ---
           flash_dtbo;
 
-          # Flash DTB to dtb/vendor_boot partition natively without breaking ramdisk
-          flash_dtb;
+          # --- 3. Flash Full DTB to vendor_boot directly (No flash_dtb error) ---
+          BLOCK=vendor_boot;
+          IS_SLOT_DEVICE=1;
+          RAMDISK_COMPRESSION=auto;
+          PATCH_VBMETA_FLAG=auto;
+
+          reset_ak;
+          split_boot;
+          flash_boot;
           EOF
 
           # 5. Create flashable zip package
@@ -128,4 +128,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: Xiaomi-11T-Pro-Kernel-Zip
-          path: Xiaomi-11T-Pro-NextGen-Kernel.zip
+          path: Xiaomi-11T-Pro-NextGen-Kernel.zipl
