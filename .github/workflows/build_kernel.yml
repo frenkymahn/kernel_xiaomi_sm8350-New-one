@@ -24,6 +24,10 @@ jobs:
           git clone --depth=1 https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86 -b android12-release .
           cd ..
 
+      - name: Setup KernelSU
+        run: |
+          curl -LSs "https://raw.githubusercontent.com/tiann/KernelSU/main/kernel/setup.sh" | bash -
+
       - name: Configure and Build Kernel
         run: |
           export PATH="$(pwd)/clang/clang-r416183b/bin:$PATH"
@@ -58,17 +62,21 @@ jobs:
 
       - name: Package Kernel with AnyKernel3
         run: |
+          # 1. Clone AnyKernel3
           git clone --depth=1 https://github.com/osm0sis/AnyKernel3.git AnyKernel3
 
+          # 2. Copy artifacts to AnyKernel3 root
           cp out/arch/arm64/boot/Image AnyKernel3/Image
           cp out/arch/arm64/boot/dtbo.img AnyKernel3/dtbo.img
           find out/arch/arm64/boot/dts/ -name "*.dtb" -exec cat {} + > AnyKernel3/dtb
 
+          # 3. Configure anykernel.sh for vili
           cd AnyKernel3
           sed -i 's/do.devicecheck=1/do.devicecheck=0/' anykernel.sh
           sed -i 's/do.modules=1/do.modules=0/' anykernel.sh
           sed -i 's/block=\/dev\/block\/bootdevice\/by-name\/boot;/block=\/dev\/block\/bootdevice\/by-name\/boot;\nis_slot_device=auto;\nflash_dtbo;/' anykernel.sh
 
+          # 4. Zip root package
           zip -r9 ../Xiaomi-11T-Pro-NextGen-Kernel.zip * -x .git README.md
 
       - name: Upload Kernel Artifact
