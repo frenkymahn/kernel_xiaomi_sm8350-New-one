@@ -5738,16 +5738,6 @@ static long binder_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 		binder_inner_proc_unlock(proc);
 		break;
 	}
-		case BINDER_ENABLE_ONEWAY_SPAM_DETECTION: {
-		uint32_t enable;
-
-		if (copy_from_user(&enable, ubuf, sizeof(enable))) {
-			ret = -EFAULT;
-			break;
-		}
-		proc->oneway_spam_detection_enabled = ((enable) ? 1 : 0);
-		break;
-		}
 	case BINDER_SET_CONTEXT_MGR_EXT: {
 		struct flat_binder_object fbo;
 
