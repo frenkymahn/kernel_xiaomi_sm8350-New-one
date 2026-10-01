@@ -181,4 +181,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: Xiaomi-11T-Pro-Kernel-Zip
-          path: Xiaomi-11T-Pro-NextGen-Kernel.zipl
+          path: Xiaomi-11T-Pro-NextGen-Kernel.zip
