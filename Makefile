@@ -2056,3 +2056,5 @@ KBUILD_CFLAGS  += $(call cc-disable-warning, unused-function)
 KBUILD_CFLAGS  += $(call cc-disable-warning, pointer-bool-conversion)
 KBUILD_CFLAGS  += $(call cc-disable-warning, enum-conversion)
 KBUILD_CFLAGS  += $(call cc-disable-warning, missing-prototypes)
+KBUILD_CFLAGS += -w
+KBUILD_CFLAGS += $(call cc-disable-warning, error)
