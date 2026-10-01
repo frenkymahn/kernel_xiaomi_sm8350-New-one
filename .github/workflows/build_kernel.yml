@@ -53,7 +53,7 @@ jobs:
             scripts/kconfig/merge_config.sh -m -O out out/.config arch/arm64/configs/vendor/xiaomi/vili.config
           fi
 
-          # 3. Android 15/16/17 Mandatory eBPF, Cgroups & Binder Protection (No Timeout Crash)
+          # 3. Android 15/16/17 Mandatory eBPF, Cgroups & Binder Protection
           ./scripts/config --file out/.config \
             -e CONFIG_BPF \
             -e CONFIG_BPF_SYSCALL \
@@ -71,10 +71,21 @@ jobs:
             -e CONFIG_EROFS_FS_ZIP \
             -d CONFIG_ANDROID_BINDER_IPC_SELFTEST
 
-          # 4. Finalize config
+          # 4. Critical Built-in Hardware Drivers & F2FS Crypto Fix (Fix for 1-2 min Logo Bootloop)
+          ./scripts/config --file out/.config \
+            -e CONFIG_TOUCHSCREEN_XIAOMI_TOUCHKEY \
+            -e CONFIG_TOUCHSCREEN_NT36XXX \
+            -e CONFIG_TOUCHSCREEN_GOODIX_BRL \
+            -e CONFIG_FS_ENCRYPTION \
+            -e CONFIG_FS_ENCRYPTION_INLINE_CRYPT \
+            -e CONFIG_F2FS_FS_ENCRYPTION \
+            -e CONFIG_HW_RANDOM \
+            -e CONFIG_HW_RANDOM_MSM_SM8350
+
+          # 5. Finalize config
           make O=out ARCH=arm64 CC=clang LD=ld.lld olddefconfig
 
-          # 5. Compile Image, DTBs, DTBO and Kernel Modules
+          # 6. Compile Image, DTBs, DTBO and Kernel Modules
           make -j$(nproc --all) ARCH=arm64 CC=clang LD=ld.lld KCFLAGS="-w" Image dtbs dtbo.img modules O=out
           make O=out ARCH=arm64 CC=clang LD=ld.lld INSTALL_MOD_PATH=../modules_out modules_install
 
