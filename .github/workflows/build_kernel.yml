@@ -15,7 +15,7 @@ jobs:
       - name: Install Build Dependencies
         run: |
           sudo apt update
-          sudo apt install -y bc bison build-essential curl flex git libssl-dev libelf-dev python3 zip libncurses5-dev
+          sudo apt install -y bc bison build-essential curl flex git libssl-dev libelf-dev python3 zip libncurses5-dev gcc-aarch64-linux-gnu gcc-arm-linux-gnueabi lld llvm
 
       - name: Download Official AOSP Clang
         run: |
@@ -30,12 +30,18 @@ jobs:
           export ARCH=arm64
           export SUBARCH=arm64
           export CC=clang
+          export LD=ld.lld
+          export AR=llvm-ar
+          export NM=llvm-nm
+          export OBJCOPY=llvm-objcopy
+          export OBJDUMP=llvm-objdump
+          export STRIP=llvm-strip
           export CLANG_TRIPLE=aarch64-linux-gnu-
           export CROSS_COMPILE=aarch64-linux-gnu-
           export CROSS_COMPILE_COMPAT=arm-linux-gnueabi-
 
           # 1. Base defconfig
-          make O=out ARCH=arm64 CC=clang vendor/lahaina-perf_defconfig
+          make O=out ARCH=arm64 CC=clang LD=ld.lld vendor/lahaina-perf_defconfig
 
           # 2. Merge Xiaomi vili config
           VILI_CONFIG=$(find arch/arm64/configs/vendor/xiaomi/ -name "*vili*" | head -n 1)
@@ -45,32 +51,28 @@ jobs:
           fi
 
           # 3. Finalize config
-          make O=out ARCH=arm64 CC=clang olddefconfig
+          make O=out ARCH=arm64 CC=clang LD=ld.lld olddefconfig
 
-          # 4. Compile Image, DTBs, DTBO without external modules
-          make -j$(nproc --all) ARCH=arm64 CC=clang KCFLAGS="-w" Image dtbs dtbo.img O=out
+          # 4. Compile Image, DTBs, DTBO
+          make -j$(nproc --all) ARCH=arm64 CC=clang LD=ld.lld KCFLAGS="-w" Image dtbs dtbo.img O=out
 
       - name: Package Kernel with AnyKernel3
         run: |
-          # 1. Clone AnyKernel3
           git clone --depth=1 https://github.com/osm0sis/AnyKernel3.git AnyKernel3
 
-          # 2. Copy compiled artifacts to AnyKernel3 root
           cp out/arch/arm64/boot/Image AnyKernel3/Image
           cp out/arch/arm64/boot/dtbo.img AnyKernel3/dtbo.img
           find out/arch/arm64/boot/dts/ -name "*.dtb" -exec cat {} + > AnyKernel3/dtb
 
-          # 3. Configure anykernel.sh for vili
           cd AnyKernel3
           sed -i 's/do.devicecheck=1/do.devicecheck=0/' anykernel.sh
           sed -i 's/do.modules=1/do.modules=0/' anykernel.sh
           sed -i 's/block=\/dev\/block\/bootdevice\/by-name\/boot;/block=\/dev\/block\/bootdevice\/by-name\/boot;\nis_slot_device=auto;\nflash_dtbo;/' anykernel.sh
 
-          # 4. Create flashable zip package
           zip -r9 ../Xiaomi-11T-Pro-NextGen-Kernel.zip * -x .git README.md
 
       - name: Upload Kernel Artifact
         uses: actions/upload-artifact@v4
         with:
           name: Xiaomi-11T-Pro-Kernel-Zip
-          path: Xiaomi-11T-Pro-NextGen-Kernel.zipp
+          path: Xiaomi-11T-Pro-NextGen-Kernel.zip
