@@ -57,7 +57,7 @@ jobs:
           # 3. Finalize config
           make O=out ARCH=arm64 CC=clang LD=ld.lld olddefconfig
 
-          # 4. Compile Image, DTBs, DTBO
+          # 4. Compile Image, DTBs, and DTBO
           make -j$(nproc --all) ARCH=arm64 CC=clang LD=ld.lld KCFLAGS="-w" Image dtbs dtbo.img O=out
 
       - name: Package Kernel with AnyKernel3
@@ -70,13 +70,62 @@ jobs:
           cp out/arch/arm64/boot/dtbo.img AnyKernel3/dtbo.img
           find out/arch/arm64/boot/dts/ -name "*.dtb" -exec cat {} + > AnyKernel3/dtb
 
-          # 3. Configure anykernel.sh for vili
-          cd AnyKernel3
-          sed -i 's/do.devicecheck=1/do.devicecheck=0/' anykernel.sh
-          sed -i 's/do.modules=1/do.modules=0/' anykernel.sh
-          sed -i 's/block=\/dev\/block\/bootdevice\/by-name\/boot;/block=\/dev\/block\/bootdevice\/by-name\/boot;\nis_slot_device=auto;\nflash_dtbo;/' anykernel.sh
+          # 3. Generate fully tuned anykernel.sh for HyperOS 3.0/4.0
+          cat << 'EOF' > AnyKernel3/anykernel.sh
+          ### AnyKernel3 Ramdisk Mod Script
+          ## osm0sis @ xda-developers
+          ## Tuned for Xiaomi 11T Pro (vili) - HyperOS 3.0/4.0 (A16-A17)
 
-          # 4. Zip root package
+          properties() { '
+          kernel.string=NextGen Kernel for Xiaomi 11T Pro (vili)
+          do.devicecheck=1
+          do.modules=0
+          do.systemless=1
+          do.cleanup=1
+          do.cleanuponabort=0
+          device.name1=Xiaomi 11T Pro
+          device.name2=milahaina
+          device.name3=vili
+          device.name4=vili_in
+          supported.versions=11.0-17.0
+          supported.patchlevels=
+          supported.vendorpatchlevels=
+          '; }
+
+          # 1. Boot Partition Setup
+          BLOCK=boot;
+          IS_SLOT_DEVICE=1;
+          RAMDISK_COMPRESSION=auto;
+          PATCH_VBMETA_FLAG=auto;
+
+          . tools/ak3-core.sh && passthrough;
+
+          dump_boot;
+
+          # Avoid bootloop on Android 16/17 port ROMs by enforcing permissive cmdline
+          patch_cmdline "androidboot.selinux" "androidboot.selinux=permissive";
+
+          write_boot;
+
+          # 2. Flash DTBO Partition (Display & Touch Panel sync)
+          flash_dtbo;
+
+          # 3. Flash DTB to Vendor Boot Partition
+          BLOCK=vendor_boot;
+          IS_SLOT_DEVICE=1;
+          RAMDISK_COMPRESSION=auto;
+          PATCH_VBMETA_FLAG=auto;
+
+          reset_ak;
+
+          split_boot;
+          unpack_ramdisk;
+          repack_ramdisk;
+          flash_boot;
+          EOF
+
+          # 4. Create flashable zip package
+          cd AnyKernel3
           zip -r9 ../Xiaomi-11T-Pro-NextGen-Kernel.zip * -x .git README.md
 
       - name: Upload Kernel Artifact
