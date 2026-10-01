@@ -71,7 +71,7 @@ jobs:
             -e CONFIG_EROFS_FS_ZIP \
             -d CONFIG_ANDROID_BINDER_IPC_SELFTEST
 
-          # 4. Critical Built-in Hardware Drivers & F2FS Crypto Fix (Fix for 1-2 min Logo Bootloop)
+          # 4. Critical Built-in Hardware Drivers & F2FS Crypto Fix
           ./scripts/config --file out/.config \
             -e CONFIG_TOUCHSCREEN_XIAOMI_TOUCHKEY \
             -e CONFIG_TOUCHSCREEN_NT36XXX \
@@ -85,9 +85,8 @@ jobs:
           # 5. Finalize config
           make O=out ARCH=arm64 CC=clang LD=ld.lld olddefconfig
 
-          # 6. Compile Image, DTBs, DTBO and Kernel Modules
-          make -j$(nproc --all) ARCH=arm64 CC=clang LD=ld.lld KCFLAGS="-w" Image dtbs dtbo.img modules O=out
-          make O=out ARCH=arm64 CC=clang LD=ld.lld INSTALL_MOD_PATH=../modules_out modules_install
+          # 6. Compile Image, DTBs, and DTBO (Monolithic kernel build)
+          make -j$(nproc --all) ARCH=arm64 CC=clang LD=ld.lld KCFLAGS="-w" Image dtbs dtbo.img O=out
 
       - name: Fetch Official HyperOS Firmware (vili)
         run: |
@@ -110,17 +109,13 @@ jobs:
           cp out/arch/arm64/boot/dtbo.img AnyKernel3/dtbo.img
           cat out/arch/arm64/boot/dts/vendor/qcom/lahaina*.dtb > AnyKernel3/dtb
 
-          # 3. Copy compiled hardware driver modules (.ko)
-          mkdir -p AnyKernel3/modules/vendor/lib/modules
-          find modules_out/ -name "*.ko" -exec cp {} AnyKernel3/modules/vendor/lib/modules/ \;
-
-          # 4. Include Firmware Partitions if extracted
+          # 3. Include Firmware Partitions if extracted
           if [ -d "firmware_extract/firmware-update" ]; then
             mkdir -p AnyKernel3/firmware-update
             cp -r firmware_extract/firmware-update/* AnyKernel3/firmware-update/
           fi
 
-          # 5. Production Tested AnyKernel Script
+          # 4. Production Tested AnyKernel Script
           cat << 'EOF' > AnyKernel3/anykernel.sh
           ### AnyKernel3 Ramdisk Mod Script
           ## osm0sis @ xda-developers
@@ -129,7 +124,7 @@ jobs:
           properties() { '
           kernel.string=NextGen Kernel + Official Firmware for Xiaomi 11T Pro (vili)
           do.devicecheck=1
-          do.modules=1
+          do.modules=0
           do.systemless=1
           do.cleanup=1
           do.cleanuponabort=0
@@ -178,7 +173,7 @@ jobs:
           fi;
           EOF
 
-          # 6. Create flashable zip package
+          # 5. Create flashable zip package
           cd AnyKernel3
           zip -r9 ../Xiaomi-11T-Pro-NextGen-Kernel.zip * -x .git README.md
 
@@ -186,4 +181,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: Xiaomi-11T-Pro-Kernel-Zip
-          path: Xiaomi-11T-Pro-NextGen-Kernel.zip
+          path: Xiaomi-11T-Pro-NextGen-Kernel.zipl
