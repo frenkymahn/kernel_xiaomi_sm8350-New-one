@@ -1,168 +1,61 @@
-name: Build Xiaomi 11T Pro Kernel
+name: Build Next-Gen Kernel (Vili)
 
 on:
+  push:
+    branches: [ "15" ]
   workflow_dispatch:
 
 jobs:
   build:
-    name: Compile and Package Kernel
-    runs-on: ubuntu-latest
-
+    runs-on: ubuntu-22.04
     steps:
       - name: Checkout Kernel Source
         uses: actions/checkout@v4
+        with:
+          depth: 1
 
-      - name: Install Build Dependencies
+      - name: Install Dependencies
         run: |
-          sudo apt update
-          sudo apt install -y bc bison build-essential curl flex git libssl-dev libelf-dev python3 zip libncurses5-dev gcc-aarch64-linux-gnu gcc-arm-linux-gnueabi lld llvm
+          sudo apt-get update
+          sudo apt-get install -y bc bison build-essential ccache curl flex git libssl-dev libelf-dev python3 python-is-python3 zip unzip wget cpio
 
-      - name: Download Official AOSP Clang
+      - name: Setup AOSP Clang 20 (r547379) & AnyKernel3
         run: |
           mkdir -p clang
-          cd clang
-          git clone --depth=1 https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86 -b android12-release .
-          cd ..
-
-      - name: Setup KernelSU
-        run: |
-          curl -LSs "https://raw.githubusercontent.com/tiann/KernelSU/main/kernel/setup.sh" | bash -
-
-      - name: Configure and Build Kernel
-        run: |
-          export PATH="$(pwd)/clang/clang-r416183b/bin:$PATH"
-          export ARCH=arm64
-          export SUBARCH=arm64
-          export CC=clang
-          export LD=ld.lld
-          export AR=llvm-ar
-          export NM=llvm-nm
-          export OBJCOPY=llvm-objcopy
-          export OBJDUMP=llvm-objdump
-          export STRIP=llvm-strip
-          export CLANG_TRIPLE=aarch64-linux-gnu-
-          export CROSS_COMPILE=aarch64-linux-gnu-
-          export CROSS_COMPILE_COMPAT=arm-linux-gnueabi-
-
-          # 1. Base defconfig
-          make O=out ARCH=arm64 CC=clang LD=ld.lld vendor/lahaina-perf_defconfig
-
-          # 2. Merge vili.config safely
-          if [ -f arch/arm64/configs/vendor/xiaomi/vili.config ]; then
-            echo "Merging vili.config..."
-            scripts/kconfig/merge_config.sh -m -O out out/.config arch/arm64/configs/vendor/xiaomi/vili.config
-          fi
-
-          # 3. Android 15/16/17 Mandatory eBPF, Cgroups & Binder Protection
-          ./scripts/config --file out/.config \
-            -e CONFIG_BPF \
-            -e CONFIG_BPF_SYSCALL \
-            -e CONFIG_NET_CLS_ACT \
-            -e CONFIG_NET_CLS_BPF \
-            -e CONFIG_NET_ACT_BPF \
-            -e CONFIG_BPF_JIT \
-            -e CONFIG_CGROUP_BPF \
-            -e CONFIG_PSI \
-            -e CONFIG_MEMCG \
-            -e CONFIG_CGROUPS \
-            -e CONFIG_NAMESPACES \
-            -e CONFIG_OVERLAY_FS \
-            -e CONFIG_EROFS_FS \
-            -e CONFIG_EROFS_FS_ZIP \
-            -d CONFIG_ANDROID_BINDER_IPC_SELFTEST
-
-          # 4. Critical Built-in Hardware Drivers & F2FS Crypto Fix
-          ./scripts/config --file out/.config \
-            -e CONFIG_TOUCHSCREEN_XIAOMI_TOUCHKEY \
-            -e CONFIG_TOUCHSCREEN_NT36XXX \
-            -e CONFIG_TOUCHSCREEN_GOODIX_BRL \
-            -e CONFIG_FS_ENCRYPTION \
-            -e CONFIG_FS_ENCRYPTION_INLINE_CRYPT \
-            -e CONFIG_F2FS_FS_ENCRYPTION \
-            -e CONFIG_HW_RANDOM \
-            -e CONFIG_HW_RANDOM_MSM_SM8350
-
-          # 5. Finalize config
-          make O=out ARCH=arm64 CC=clang LD=ld.lld olddefconfig
-
-          # 6. Compile Image, DTBs, and DTBO (Monolithic kernel build)
-          make -j$(nproc --all) ARCH=arm64 CC=clang LD=ld.lld KCFLAGS="-w" Image dtbs dtbo.img O=out
-
-      - name: Package Kernel with AnyKernel3
-        run: |
-          # 1. Clone AnyKernel3
+          wget -q https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/main/clang-r547379.tar.gz -O clang.tar.gz
+          tar -xzf clang.tar.gz -C clang
+          rm -f clang.tar.gz
           git clone --depth=1 https://github.com/osm0sis/AnyKernel3.git AnyKernel3
 
-          # 2. Copy compiled Image, DTBO and DTB
-          cp out/arch/arm64/boot/Image AnyKernel3/Image
-          cp out/arch/arm64/boot/dtbo.img AnyKernel3/dtbo.img
-          cat out/arch/arm64/boot/dts/vendor/qcom/lahaina*.dtb > AnyKernel3/dtb
+      - name: Build Kernel (5.4.302-NEXTGEN)
+        run: |
+          export PATH="$PWD/clang/bin:$PATH"
+          export ARCH=arm64
+          export SUBARCH=arm64
+          export KBUILD_BUILD_USER="frenkymahn"
+          export KBUILD_BUILD_HOST="NextGen"
 
-          # 3. Include Firmware Partitions if extracted
-          fi
+          make O=out ARCH=arm64 vendor/lahaina-perf_defconfig vendor/xiaomi/vili.config
+          make -j$(nproc --all) O=out \
+            ARCH=arm64 \
+            CC="ccache clang" \
+            CLANG_TRIPLE=aarch64-linux-gnu- \
+            CROSS_COMPILE=aarch64-linux-gnu- \
+            CROSS_COMPILE_ARM32=arm-linux-gnueabi- \
+            LLVM=1 \
+            LLVM_IAS=1
 
-          # 4. Production Tested AnyKernel Script
-          cat << 'EOF' > AnyKernel3/anykernel.sh
-          ### AnyKernel3 Ramdisk Mod Script
-          ## osm0sis @ xda-developers
-          ## Xiaomi 11T Pro (vili) - Android 15 to 17
-
-          properties() { '
-          kernel.string=NextGen Kernel + Official Firmware for Xiaomi 11T Pro (vili)
-          do.devicecheck=1
-          do.modules=0
-          do.systemless=1
-          do.cleanup=1
-          do.cleanuponabort=0
-          device.name1=Xiaomi 11T Pro
-          device.name2=milahaina
-          device.name3=vili
-          device.name4=vili_in
-          supported.versions=11.0-17.0
-          '; }
-
-          # --- 1. Flash Kernel Image to boot partition ---
-          BLOCK=boot;
-          IS_SLOT_DEVICE=1;
-          RAMDISK_COMPRESSION=auto;
-          PATCH_VBMETA_FLAG=auto;
-
-          . tools/ak3-core.sh && passthrough;
-
-          dump_boot;
-          write_boot;
-
-          # --- 2. Flash DTBO Partition safely ---
-          flash_dtbo;
-
-          # --- 3. Flash Full DTB to vendor_boot directly ---
-          BLOCK=vendor_boot;
-          IS_SLOT_DEVICE=1;
-          RAMDISK_COMPRESSION=auto;
-          PATCH_VBMETA_FLAG=auto;
-
-          reset_ak;
-          split_boot;
-          flash_boot;
-
-          # --- 4. Flash Official Firmware Partitions safely ---
-            ui_print "Flashing official firmware partitions...";
-              part=$(basename "$img" .img);
-              if [ -e "/dev/block/by-name/${part}_a" ]; then
-                flash_generic "$img" "/dev/block/by-name/${part}_a";
-              elif [ -e "/dev/block/by-name/${part}" ]; then
-                flash_generic "$img" "/dev/block/by-name/${part}";
-              fi;
-            done;
-          fi;
-          EOF
-
-          # 5. Create flashable zip package
+      - name: Package AnyKernel3 Flashable ZIP
+        run: |
+          cp out/arch/arm64/boot/Image AnyKernel3/
+          cp out/arch/arm64/boot/dtbo.img AnyKernel3/ 2>/dev/null || true
+          cat out/arch/arm64/boot/dts/vendor/qcom/*.dtb > AnyKernel3/dtb 2>/dev/null || true
           cd AnyKernel3
-          zip -r9 ../Xiaomi-11T-Pro-NextGen-Kernel.zip * -x .git README.md
+          rm -rf .git
+          zip -r9 ../NextGen-5.4.302-KSU-SUSFS-Vili.zip * -x .git README.md *placeholder
 
-      - name: Upload Kernel Artifact
+      - name: Upload Kernel ZIP
         uses: actions/upload-artifact@v4
         with:
-          name: Xiaomi-11T-Pro-Kernel-Zip
-          path: Xiaomi-11T-Pro-NextGen-Kernel.zip
+          name: NextGen-5.4.302-KSU-SUSFS-Vili
+          path: NextGen-5.4.302-KSU-SUSFS-Vili.zip
