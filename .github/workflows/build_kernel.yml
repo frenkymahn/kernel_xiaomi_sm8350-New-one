@@ -88,17 +88,6 @@ jobs:
           # 6. Compile Image, DTBs, and DTBO (Monolithic kernel build)
           make -j$(nproc --all) ARCH=arm64 CC=clang LD=ld.lld KCFLAGS="-w" Image dtbs dtbo.img O=out
 
-      - name: Fetch Official HyperOS Firmware (vili)
-        run: |
-          mkdir -p firmware_extract
-          cd firmware_extract
-          # Fetching official tested HyperOS firmware for Xiaomi 11T Pro (vili)
-          curl -LO "https://bigota.d.miui.com/OS1.0.4.0.UKDMIXM/miui_VILIGlobal_OS1.0.4.0.UKDMIXM_5e7bb9e2d3_14.0.zip" || true
-          if ls *.zip 1> /dev/null 2>&1; then
-            unzip -q *.zip "firmware-update/*" || true
-          fi
-          cd ..
-
       - name: Package Kernel with AnyKernel3
         run: |
           # 1. Clone AnyKernel3
@@ -110,9 +99,6 @@ jobs:
           cat out/arch/arm64/boot/dts/vendor/qcom/lahaina*.dtb > AnyKernel3/dtb
 
           # 3. Include Firmware Partitions if extracted
-          if [ -d "firmware_extract/firmware-update" ]; then
-            mkdir -p AnyKernel3/firmware-update
-            cp -r firmware_extract/firmware-update/* AnyKernel3/firmware-update/
           fi
 
           # 4. Production Tested AnyKernel Script
@@ -160,9 +146,7 @@ jobs:
           flash_boot;
 
           # --- 4. Flash Official Firmware Partitions safely ---
-          if [ -d "$home/firmware-update" ]; then
             ui_print "Flashing official firmware partitions...";
-            for img in "$home/firmware-update"/*.img; do
               part=$(basename "$img" .img);
               if [ -e "/dev/block/by-name/${part}_a" ]; then
                 flash_generic "$img" "/dev/block/by-name/${part}_a";
