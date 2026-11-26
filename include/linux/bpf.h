@@ -28,6 +28,8 @@ extern struct idr btf_idr;
 extern spinlock_t btf_idr_lock;
 
 /* map is generic key/value storage optionally accesible by eBPF programs */
+struct poll_table_struct;
+
 struct bpf_map_ops {
 	int (*map_mmap)(struct bpf_map *map, struct vm_area_struct *vma);
 	__poll_t (*map_poll)(struct bpf_map *map, struct file *file, struct poll_table_struct *pts);
