@@ -22,9 +22,14 @@ jobs:
       - name: Setup AOSP Clang 20 (r547379) & AnyKernel3
         run: |
           mkdir -p clang
-          wget -q https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/main/clang-r547379.tar.gz -O clang.tar.gz
-          tar -xzf clang.tar.gz -C clang
-          rm -f clang.tar.gz
+          git clone --depth=1 --filter=blob:none --sparse https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86 clang_repo
+          cd clang_repo
+          git sparse-checkout set clang-r547379
+          mv clang-r547379/* ../clang/
+          cd ..
+          rm -rf clang_repo
+          chmod +x clang/bin/*
+          clang/bin/clang --version
           git clone --depth=1 https://github.com/osm0sis/AnyKernel3.git AnyKernel3
 
       - name: Build Kernel (5.4.302-NEXTGEN)
