@@ -960,7 +960,7 @@ return tsec->sid == sid2;
 
 bool susfs_is_current_ksu_domain(void)
 {
-struct task_security_struct *tsec = current_security();
+struct task_security_struct *tsec = current_cred()->security;
 if (!tsec)
 return false;
 if (!susfs_ksu_sid)
@@ -970,7 +970,7 @@ return (susfs_ksu_sid && tsec->sid == susfs_ksu_sid);
 
 bool susfs_is_current_zygote_domain(void)
 {
-struct task_security_struct *tsec = current_security();
+struct task_security_struct *tsec = current_cred()->security;
 if (!tsec)
 return false;
 if (!susfs_zygote_sid)
