@@ -29,7 +29,6 @@ jobs:
           cd ..
           rm -rf clang_repo
           chmod +x clang/bin/*
-          clang/bin/clang --version
           git clone --depth=1 https://github.com/osm0sis/AnyKernel3.git AnyKernel3
 
       - name: Build Kernel (5.4.302-NEXTGEN)
@@ -41,9 +40,36 @@ jobs:
           export KBUILD_BUILD_HOST="NextGen"
 
           make O=out ARCH=arm64 vendor/lahaina-perf_defconfig vendor/xiaomi/vili.config
+
+          # Enforce latest KernelSU + SUSFS options and disable OnePlus-only CONFIG_OPLUS
+          ./scripts/config --file out/.config \
+            -d OPLUS \
+            -e KSU \
+            -e KSU_SUSFS \
+            -e KSU_SUSFS_HAS_MAGIC_MOUNT \
+            -e KSU_SUSFS_SUS_PATH \
+            -e KSU_SUSFS_SUS_MOUNT \
+            -e KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_MOUNT \
+            -e KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT \
+            -e KSU_SUSFS_SUS_KSTAT \
+            -e KSU_SUSFS_SUS_OVERLAYFS \
+            -e KSU_SUSFS_TRY_UMOUNT \
+            -e KSU_SUSFS_AUTO_ADD_TRY_UMOUNT_FOR_BIND_MOUNT \
+            -e KSU_SUSFS_SPOOF_UNAME \
+            -e KSU_SUSFS_ENABLE_LOG \
+            -e KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS \
+            -e KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG \
+            -e KSU_SUSFS_OPEN_REDIRECT \
+            -e KSU_SUSFS_SUS_SU
+
+          make O=out ARCH=arm64 olddefconfig
+
+          # Verify KSU_SUSFS and OPLUS in final .config
+          grep -E "CONFIG_KSU_SUSFS=|CONFIG_OPLUS" out/.config || true
+
           make -j$(nproc --all) O=out \
             ARCH=arm64 \
-            CC="ccache clang" \
+            CC=clang \
             CLANG_TRIPLE=aarch64-linux-gnu- \
             CROSS_COMPILE=aarch64-linux-gnu- \
             CROSS_COMPILE_ARM32=arm-linux-gnueabi- \
