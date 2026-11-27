@@ -62,12 +62,14 @@ jobs:
             -e KSU_SUSFS_OPEN_REDIRECT \
             -e KSU_SUSFS_SUS_SU
 
+          ./scripts/config --file out/.config -d RANDOMIZE_BASE -d RELOCATABLE -e LTO_CLANG -d LTO_NONE -e BUILD_ARM64_UNCOMPRESSED_KERNEL -d BUILD_ARM64_KERNEL_COMPRESSION_GZIP
           make O=out ARCH=arm64 olddefconfig
 
           # Verify KSU_SUSFS and OPLUS in final .config
           grep -E "CONFIG_KSU_SUSFS=|CONFIG_OPLUS" out/.config || true
 
           ./scripts/config --file out/.config -e MODULE_FORCE_LOAD -e MODULES -e MODULE_UNLOAD -e MODULE_FORCE_UNLOAD -d MODVERSIONS
+          ./scripts/config --file out/.config -d RANDOMIZE_BASE -d RELOCATABLE -e LTO_CLANG -d LTO_NONE -e BUILD_ARM64_UNCOMPRESSED_KERNEL -d BUILD_ARM64_KERNEL_COMPRESSION_GZIP
           make O=out ARCH=arm64 olddefconfig
           make -j$(nproc --all) O=out \
             ARCH=arm64 \
