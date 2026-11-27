@@ -67,6 +67,8 @@ jobs:
           # Verify KSU_SUSFS and OPLUS in final .config
           grep -E "CONFIG_KSU_SUSFS=|CONFIG_OPLUS" out/.config || true
 
+          ./scripts/config --file out/.config -e MODULE_FORCE_LOAD -e MODULES -e MODULE_UNLOAD -e MODULE_FORCE_UNLOAD -d MODVERSIONS
+          make O=out ARCH=arm64 olddefconfig
           make -j$(nproc --all) O=out \
             ARCH=arm64 \
             CC=clang \
