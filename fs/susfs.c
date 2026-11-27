@@ -914,3 +914,66 @@ void susfs_init(void) {
 /* No module exit is needed becuase it should never be a loadable kernel module */
 //void __init susfs_exit(void)
 
+
+
+/* SUSFS SELinux SID & Domain Tracking Implementation */
+#include <linux/cred.h>
+#include <linux/sched.h>
+#include <linux/security.h>
+#include "../security/selinux/include/objsec.h"
+#include "../security/selinux/include/security.h"
+
+static u32 susfs_init_sid = 0;
+static u32 susfs_ksu_sid = 0;
+static u32 susfs_zygote_sid = 0;
+
+static u32 susfs_get_sid_from_ctx(const char *ctx)
+{
+u32 sid = 0;
+if (!security_secctx_to_secid(ctx, strlen(ctx), &sid))
+return sid;
+return 0;
+}
+
+void susfs_set_init_sid(void)
+{
+susfs_init_sid = susfs_get_sid_from_ctx("u:r:init:s0");
+}
+
+void susfs_set_ksu_sid(void)
+{
+susfs_ksu_sid = susfs_get_sid_from_ctx("u:r:su:s0");
+}
+
+void susfs_set_zygote_sid(void)
+{
+susfs_zygote_sid = susfs_get_sid_from_ctx("u:r:zygote:s0");
+}
+
+bool susfs_is_sid_equal(void *sec, u32 sid2)
+{
+struct task_security_struct *tsec = (struct task_security_struct *)sec;
+if (!tsec || !sid2)
+return false;
+return tsec->sid == sid2;
+}
+
+bool susfs_is_current_ksu_domain(void)
+{
+struct task_security_struct *tsec = current_security();
+if (!tsec)
+return false;
+if (!susfs_ksu_sid)
+susfs_set_ksu_sid();
+return (susfs_ksu_sid && tsec->sid == susfs_ksu_sid);
+}
+
+bool susfs_is_current_zygote_domain(void)
+{
+struct task_security_struct *tsec = current_security();
+if (!tsec)
+return false;
+if (!susfs_zygote_sid)
+susfs_set_zygote_sid();
+return (susfs_zygote_sid && tsec->sid == susfs_zygote_sid);
+}
