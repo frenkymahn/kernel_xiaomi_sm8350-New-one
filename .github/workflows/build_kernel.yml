@@ -76,5 +76,11 @@ jobs:
             LLVM=1 \
             LLVM_IAS=1
 
-    - name: Package AnyKernel3 Flashable ZIP (RED-style Vili Android 16/17 Setup)
-      run: bash package_ak3.sh
+      - name: Package AnyKernel3 Flashable ZIP (RED-style Vili Android 16/17 Setup)
+        run: bash package_ak3.sh
+
+      - name: Upload Kernel ZIP
+        uses: actions/upload-artifact@v4
+        with:
+          name: NextGen-5.4.302-KSU-SUSFS-Vili
+          path: NextGen-5.4.302-KSU-SUSFS-Vili.zip
