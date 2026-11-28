@@ -22,12 +22,7 @@ jobs:
       - name: Setup AOSP Clang 14 (r450784d) & AnyKernel3
         run: |
           mkdir -p clang
-          git clone --depth=1 --filter=blob:none --sparse https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86 clang_repo
-          cd clang_repo
-          git sparse-checkout set clang-r450784d
-          mv clang-r450784d/* ../clang/
-          cd ..
-          rm -rf clang_repo
+          wget -q https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/android13-release/clang-r450784d.tar.gz -O clang.tar.gz && tar -xzf clang.tar.gz -C clang && rm -f clang.tar.gz
           chmod +x clang/bin/*
           git clone --depth=1 https://github.com/osm0sis/AnyKernel3.git AnyKernel3
 
