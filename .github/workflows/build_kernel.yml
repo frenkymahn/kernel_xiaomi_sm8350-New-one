@@ -63,12 +63,12 @@ jobs:
             -e MODULES \
             -e MODULE_UNLOAD \
             -d MODVERSIONS \
-            -d RANDOMIZE_BASE \
-            -d RELOCATABLE \
+            -e RANDOMIZE_BASE \
+            -e RELOCATABLE \
             -e LTO_CLANG \
             -d LTO_NONE \
-            -e BUILD_ARM64_UNCOMPRESSED_KERNEL \
-            -d BUILD_ARM64_KERNEL_COMPRESSION_GZIP
+            -d BUILD_ARM64_UNCOMPRESSED_KERNEL \
+            -e BUILD_ARM64_KERNEL_COMPRESSION_GZIP
 
           make O=out ARCH=arm64 LLVM=1 LLVM_IAS=1 olddefconfig
 
